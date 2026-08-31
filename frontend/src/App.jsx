@@ -12,25 +12,34 @@ const Templates = lazy(() => import('./pages/Templates/Templates'));
 const Settings = lazy(() => import('./pages/Settings/Settings'));
 const Drivers = lazy(() => import('./pages/Drivers/Drivers'));
 const Vehicles = lazy(() => import('./pages/Vehicles/Vehicles'));
+const Login = lazy(() => import('./pages/Login/Login'));
 
 function App() {
   return (
     <Router>
-      <Layout>
-        <Suspense fallback={<Loader />}>
-          <Routes>
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/generate" element={<GenerateSummary />} />
-            <Route path="/history" element={<History />} />
-            <Route path="/analytics" element={<Analytics />} />
-            <Route path="/templates" element={<Templates />} />
-            <Route path="/drivers" element={<Drivers />} />
-            <Route path="/vehicles" element={<Vehicles />} />
-            <Route path="/settings" element={<Settings />} />
-          </Routes>
-        </Suspense>
-      </Layout>
+      <Suspense fallback={<Loader />}>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route 
+            path="/*" 
+            element={
+              <Layout>
+                <Routes>
+                  <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                  <Route path="/dashboard" element={<Dashboard />} />
+                  <Route path="/generate" element={<GenerateSummary />} />
+                  <Route path="/history" element={<History />} />
+                  <Route path="/analytics" element={<Analytics />} />
+                  <Route path="/templates" element={<Templates />} />
+                  <Route path="/drivers" element={<Drivers />} />
+                  <Route path="/vehicles" element={<Vehicles />} />
+                  <Route path="/settings" element={<Settings />} />
+                </Routes>
+              </Layout>
+            } 
+          />
+        </Routes>
+      </Suspense>
     </Router>
   );
 }

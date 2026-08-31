@@ -1,11 +1,14 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { LogOut } from 'lucide-react';
 import Button from '../../components/Button/Button';
 import styles from './Settings.module.css';
 import { getStoredSettings, saveStoredSettings } from '../../services/settingsService';
 
 const Settings = () => {
   const [settings, setSettings] = useState(() => getStoredSettings());
+  const navigate = useNavigate();
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -35,6 +38,26 @@ const Settings = () => {
     e.preventDefault();
     saveStoredSettings(settings);
     alert('Settings saved successfully!');
+  };
+
+  const handleLogout = () => {
+    // Clear stored authentication data from localStorage/sessionStorage
+    localStorage.removeItem('token');
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('user');
+    localStorage.removeItem('auth');
+    localStorage.removeItem('session');
+    localStorage.removeItem('isAuthenticated');
+    localStorage.removeItem('isLoggedIn');
+    sessionStorage.clear();
+
+    if (window.authLogout && typeof window.authLogout === 'function') {
+      window.authLogout();
+    }
+    window.dispatchEvent(new Event('userLogout'));
+
+    // Redirect user to existing Login page, replacing browser history entry
+    navigate('/login', { replace: true });
   };
 
   return (
@@ -108,6 +131,17 @@ const Settings = () => {
                 />
                 <span className={styles.slider}></span>
               </label>
+            </div>
+
+            <div className={styles.logoutRow}>
+              <button 
+                type="button" 
+                className={styles.logoutBtn}
+                onClick={handleLogout}
+              >
+                <LogOut size={18} />
+                <span>Logout</span>
+              </button>
             </div>
           </form>
         </div>
