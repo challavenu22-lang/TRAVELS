@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Rocket } from 'lucide-react';
 import styles from './Login.module.css';
+import { loginUser } from '../../services/authService';
 
 const Login = () => {
   const [email, setEmail] = useState('admin@manivthatours.com');
@@ -10,8 +11,7 @@ const Login = () => {
 
   const handleLogin = (e) => {
     e.preventDefault();
-    localStorage.setItem('isAuthenticated', 'true');
-    localStorage.setItem('token', 'session-active-token');
+    loginUser('session-active-token');
     navigate('/dashboard', { replace: true });
   };
 

@@ -5,6 +5,7 @@ import { LogOut } from 'lucide-react';
 import Button from '../../components/Button/Button';
 import styles from './Settings.module.css';
 import { getStoredSettings, saveStoredSettings } from '../../services/settingsService';
+import { logoutUser } from '../../services/authService';
 
 const Settings = () => {
   const [settings, setSettings] = useState(() => getStoredSettings());
@@ -41,22 +42,7 @@ const Settings = () => {
   };
 
   const handleLogout = () => {
-    // Clear stored authentication data from localStorage/sessionStorage
-    localStorage.removeItem('token');
-    localStorage.removeItem('authToken');
-    localStorage.removeItem('user');
-    localStorage.removeItem('auth');
-    localStorage.removeItem('session');
-    localStorage.removeItem('isAuthenticated');
-    localStorage.removeItem('isLoggedIn');
-    sessionStorage.clear();
-
-    if (window.authLogout && typeof window.authLogout === 'function') {
-      window.authLogout();
-    }
-    window.dispatchEvent(new Event('userLogout'));
-
-    // Redirect user to existing Login page, replacing browser history entry
+    logoutUser();
     navigate('/login', { replace: true });
   };
 
