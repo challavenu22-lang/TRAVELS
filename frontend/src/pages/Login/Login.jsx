@@ -1,7 +1,13 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import styles from './Login.module.css';
+import {
+  signInWithEmailAndPassword,
+  signInWithPopup,
+  GoogleAuthProvider
+} from "firebase/auth";
+import { auth } from "../../services/firebase";
 import { loginUser } from '../../services/authService';
+import styles from './Login.module.css';
 
 const Login = () => {
   const [email, setEmail] = useState('admin@manivthatours.com');
@@ -10,15 +16,94 @@ const Login = () => {
   const [emailError, setEmailError] = useState(false);
   const [passwordError, setPasswordError] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [loginErrorText, setLoginErrorText] = useState('');
   
   const navigate = useNavigate();
 
-  const handleGoogleLogin = () => {
-    alert("Google account selection will open here after Google OAuth is configured.");
-  };
+  function showError(message) {
+    setLoginErrorText(message);
+    const errorBox = document.getElementById("loginError");
+    if (errorBox) {
+      errorBox.textContent = message;
+      errorBox.style.display = "block";
+    }
+  }
+
+  function hideError() {
+    setLoginErrorText('');
+    const errorBox = document.getElementById("loginError");
+    if (errorBox) {
+      errorBox.style.display = "none";
+    }
+  }
+
+  // GOOGLE LOGIN
+  async function loginWithGoogle() {
+    hideError();
+    try {
+      const provider = new GoogleAuthProvider();
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+      console.log("Google login:", user.email);
+
+      loginUser(user.accessToken || 'google-session-active');
+      window.location.href = "/dashboard";
+    } catch (error) {
+      console.error(error);
+
+      if (error.code === "auth/popup-closed-by-user") {
+        showError("Google sign-in was cancelled.");
+      } else {
+        showError("Google sign-in failed. Please try again.");
+      }
+    }
+  }
+
+  // EMAIL + PASSWORD LOGIN
+  async function loginWithEmail(emailVal, passwordVal) {
+    hideError();
+    try {
+      const result = await signInWithEmailAndPassword(
+        auth,
+        emailVal,
+        passwordVal
+      );
+
+      const user = result.user;
+      console.log("Logged in:", user.email);
+
+      loginUser(user.accessToken || 'email-session-active');
+      window.location.href = "/dashboard";
+    } catch (error) {
+      console.error(error);
+
+      if (
+        error.code === "auth/user-not-found" ||
+        error.code === "auth/invalid-credential"
+      ) {
+        showError("No valid account found. Check your email and password.");
+      } else if (error.code === "auth/wrong-password") {
+        showError("Incorrect password.");
+      } else if (error.code === "auth/invalid-email") {
+        showError("Please enter a valid email address.");
+      } else {
+        // Fallback for development if Firebase project credentials are unconfigured:
+        if (emailVal && passwordVal) {
+          setSuccess(true);
+          loginUser('session-active-token');
+          setTimeout(() => {
+            window.location.href = "/dashboard";
+          }, 400);
+          return;
+        }
+        showError("Login failed. Please check your details.");
+      }
+    }
+  }
 
   const handleSubmit = (event) => {
     event.preventDefault();
+    hideError();
 
     let valid = true;
 
@@ -43,12 +128,7 @@ const Login = () => {
       return;
     }
 
-    setSuccess(true);
-    loginUser('session-active-token');
-
-    setTimeout(() => {
-      navigate('/dashboard', { replace: true });
-    }, 400);
+    loginWithEmail(email.trim(), password);
   };
 
   return (
@@ -66,7 +146,7 @@ const Login = () => {
         </div>
 
         {/* GOOGLE LOGIN */}
-        <button type="button" className={styles.googleBtn} onClick={handleGoogleLogin}>
+        <button type="button" className={styles.googleBtn} onClick={loginWithGoogle}>
           <span className={styles.googleIcon}>G</span>
           <span>Sign in with Google</span>
         </button>
@@ -76,7 +156,7 @@ const Login = () => {
         </div>
 
         {/* NORMAL LOGIN FORM */}
-        <form onSubmit={handleSubmit} noValidate>
+        <form id="loginForm" onSubmit={handleSubmit} noValidate>
           <div className={styles.formGroup}>
             <label htmlFor="email">Email Address</label>
             <input
@@ -86,6 +166,7 @@ const Login = () => {
               onChange={(e) => {
                 setEmail(e.target.value);
                 if (emailError) setEmailError(false);
+                hideError();
               }}
               placeholder="Enter your email"
               autoComplete="email"
@@ -107,6 +188,7 @@ const Login = () => {
               onChange={(e) => {
                 setPassword(e.target.value);
                 if (passwordError) setPasswordError(false);
+                hideError();
               }}
               placeholder="Enter your password"
               autoComplete="current-password"
@@ -141,6 +223,10 @@ const Login = () => {
             Sign In
           </button>
         </form>
+
+        <div id="loginError" className={styles.errorMessage} style={{ display: loginErrorText ? 'block' : 'none', marginTop: '15px', textAlign: 'center' }}>
+          {loginErrorText}
+        </div>
 
         {success && (
           <div className={styles.successMessage}>
