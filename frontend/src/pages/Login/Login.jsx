@@ -1,86 +1,46 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  signInWithEmailAndPassword,
-  signInWithPopup,
-  GoogleAuthProvider
-} from "firebase/auth";
-import { Mail, Lock, Eye, EyeOff, Rocket } from 'lucide-react';
-import { auth } from "../../services/firebase";
+import { User, Lock, Eye, EyeOff, Rocket, Mail } from 'lucide-react';
 import { loginUser } from '../../services/authService';
 import styles from './Login.module.css';
 
 const Login = () => {
-  const [email, setEmail] = useState('admin@manivthatours.com');
-  const [password, setPassword] = useState('123456');
+  // Fields MUST start empty
+  const [identifier, setIdentifier] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [loginErrorText, setLoginErrorText] = useState('');
-  
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Forgot password modal state
+  const [showForgotModal, setShowForgotModal] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotStatusText, setForgotStatusText] = useState('');
+  const [forgotErrorText, setForgotErrorText] = useState('');
+  const [isSendingForgot, setIsSendingForgot] = useState(false);
+
   const navigate = useNavigate();
 
   function showLoginError(message) {
     setLoginErrorText(message);
-    const box = document.getElementById("loginError");
-    if (box) {
-      box.textContent = message;
-      box.style.display = "block";
-    }
   }
 
   function hideError() {
     setLoginErrorText('');
-    const box = document.getElementById("loginError");
-    if (box) {
-      box.style.display = "none";
-    }
   }
 
   // ===============================
-  // GOOGLE LOGIN
+  // REAL LOGIN (Email or Username + Password)
   // ===============================
-  async function loginWithGoogle() {
-    hideError();
-    const provider = new GoogleAuthProvider();
-
-    try {
-      const result = await signInWithPopup(auth, provider);
-      const user = result.user;
-
-      console.log("Google user:", user.email);
-
-      loginUser(user.accessToken || 'google-session-active');
-      window.location.href = "/dashboard";
-    } catch (error) {
-      console.error("Google login error:", error);
-
-      let message = "Google sign-in failed. Please try again.";
-
-      if (error.code === "auth/popup-closed-by-user") {
-        message = "Google sign-in was cancelled.";
-      }
-      if (error.code === "auth/popup-blocked") {
-        message = "Your browser blocked the Google sign-in window.";
-      }
-      if (error.code === "auth/unauthorized-domain") {
-        message = "This website domain is not authorized for Google login.";
-      }
-
-      showLoginError(message);
-    }
-  }
-
-  // ===============================
-  // EMAIL + PASSWORD LOGIN
-  // ===============================
-  async function loginWithEmail() {
+  const loginWithCredentials = async () => {
     hideError();
 
-    const emailVal = document.getElementById("email") ? document.getElementById("email").value.trim() : email.trim();
-    const passwordVal = document.getElementById("password") ? document.getElementById("password").value : password;
+    const identVal = identifier.trim();
+    const passwordVal = password;
 
-    if (!emailVal) {
-      showLoginError("Please enter your email address.");
+    if (!identVal) {
+      showLoginError("Please enter your email or username.");
       return;
     }
 
@@ -89,36 +49,69 @@ const Login = () => {
       return;
     }
 
+    setIsLoading(true);
+
     try {
-      const result = await signInWithEmailAndPassword(
-        auth,
-        emailVal,
-        passwordVal
-      );
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ identifier: identVal, password: passwordVal })
+      });
 
-      console.log("Logged in:", result.user.email);
+      const data = await response.json();
 
-      // Only redirect after Firebase confirms login
-      loginUser(result.user.accessToken || 'email-session-active');
-      window.location.href = "/dashboard";
-    } catch (error) {
-      console.error("Login error:", error);
-
-      // Fallback for development if Firebase project is unconfigured locally
-      if (emailVal && passwordVal) {
-        loginUser('session-active-token');
-        window.location.href = "/dashboard";
+      if (!response.ok) {
+        showLoginError("Invalid username/email or password.");
+        setIsLoading(false);
         return;
       }
 
-      // Do NOT redirect on actual error
-      showLoginError("Invalid email or password. Please check your details.");
+      // Successful backend login
+      loginUser(data.token, data.user, rememberMe);
+      navigate('/dashboard');
+    } catch (error) {
+      console.error("Login request error:", error);
+      showLoginError("Something went wrong. Please try again.");
+      setIsLoading(false);
     }
-  }
+  };
 
   const handleSubmit = (event) => {
     event.preventDefault();
-    loginWithEmail();
+    loginWithCredentials();
+  };
+
+  // ===============================
+  // FORGOT PASSWORD HANDLER
+  // ===============================
+  const handleSendResetLink = async (e) => {
+    e.preventDefault();
+    setForgotStatusText('');
+    setForgotErrorText('');
+
+    if (!forgotEmail.trim()) {
+      setForgotErrorText('Please enter your email address.');
+      return;
+    }
+
+    setIsSendingForgot(true);
+    try {
+      const res = await fetch('/api/auth/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: forgotEmail.trim() })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setForgotStatusText(data.message || 'Password reset link sent successfully.');
+      } else {
+        setForgotErrorText(data.error || 'Failed to send reset link.');
+      }
+    } catch (err) {
+      setForgotErrorText('Something went wrong. Please try again.');
+    } finally {
+      setIsSendingForgot(false);
+    }
   };
 
   return (
@@ -139,46 +132,29 @@ const Login = () => {
           </p>
         </div>
 
-        {/* GOOGLE LOGIN BUTTON */}
-        <button 
-          type="button" 
-          className={styles.googleBtn} 
-          onClick={loginWithGoogle}
-        >
-          <svg className={styles.googleIconSvg} width="20" height="20" viewBox="0 0 24 24">
-            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
-            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
-          </svg>
-          <span>Sign in with Google</span>
-        </button>
-
-        {/* DIVIDER */}
-        <div className={styles.divider}>
-          <span>OR</span>
-        </div>
-
-        {/* NORMAL LOGIN FORM */}
+        {/* LOGIN FORM */}
         <form id="loginForm" onSubmit={handleSubmit} noValidate>
+          
+          {/* Email or Username */}
           <div className={styles.formGroup}>
-            <label htmlFor="email">Email Address</label>
+            <label htmlFor="identifier">Email or Username</label>
             <div className={styles.inputWrapper}>
-              <Mail className={styles.inputIconLeft} size={18} />
+              <User className={styles.inputIconLeft} size={18} />
               <input
-                id="email"
-                type="email"
-                value={email}
+                id="identifier"
+                type="text"
+                value={identifier}
                 onChange={(e) => {
-                  setEmail(e.target.value);
+                  setIdentifier(e.target.value);
                   hideError();
                 }}
-                placeholder="Enter your Google email"
-                autoComplete="email"
+                placeholder="Enter your email or username"
+                autoComplete="username"
               />
             </div>
           </div>
 
+          {/* Password */}
           <div className={styles.formGroup}>
             <label htmlFor="password">Password</label>
             <div className={styles.inputWrapper}>
@@ -217,18 +193,23 @@ const Login = () => {
 
             <span 
               className={styles.forgot} 
-              onClick={() => alert("Please contact system admin to reset password.")}
+              onClick={() => {
+                setForgotEmail(identifier.includes('@') ? identifier : '');
+                setForgotStatusText('');
+                setForgotErrorText('');
+                setShowForgotModal(true);
+              }}
             >
               Forgot password?
             </span>
           </div>
 
           <button
-            type="button"
+            type="submit"
             className={styles.signinBtn}
-            onClick={loginWithEmail}
+            disabled={isLoading}
           >
-            Sign In
+            {isLoading ? "Signing In..." : "SIGN IN"}
           </button>
         </form>
 
@@ -242,12 +223,68 @@ const Login = () => {
 
         <div className={styles.bottom}>
           Don't have an account?{' '}
-          <span onClick={() => alert("Please contact admin@manivthatours.com to request access.")}>
-            Contact Admin
+          <span onClick={() => navigate('/register')}>
+            Create Account
           </span>
         </div>
 
       </div>
+
+      {/* FORGOT PASSWORD MODAL */}
+      {showForgotModal && (
+        <div className={styles.modalOverlay} onClick={() => setShowForgotModal(false)}>
+          <div className={styles.modalCard} onClick={(e) => e.stopPropagation()}>
+            <h2>Forgot Password</h2>
+            <p>Enter your account email address below to receive a password reset link.</p>
+            
+            <form onSubmit={handleSendResetLink}>
+              <div className={styles.formGroup}>
+                <label htmlFor="forgotEmailInput">Email Address</label>
+                <div className={styles.inputWrapper}>
+                  <Mail className={styles.inputIconLeft} size={18} />
+                  <input
+                    id="forgotEmailInput"
+                    type="email"
+                    value={forgotEmail}
+                    onChange={(e) => setForgotEmail(e.target.value)}
+                    placeholder="Enter your registered email"
+                  />
+                </div>
+              </div>
+
+              {forgotErrorText && (
+                <div className={styles.loginErrorBox}>
+                  {forgotErrorText}
+                </div>
+              )}
+
+              {forgotStatusText && (
+                <div className={styles.successBox}>
+                  {forgotStatusText}
+                </div>
+              )}
+
+              <div className={styles.modalActions}>
+                <button
+                  type="button"
+                  className={styles.cancelBtn}
+                  onClick={() => setShowForgotModal(false)}
+                >
+                  Close
+                </button>
+                <button
+                  type="submit"
+                  className={styles.signinBtn}
+                  disabled={isSendingForgot}
+                  style={{ flex: 1 }}
+                >
+                  {isSendingForgot ? "Sending..." : "Send Reset Link"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

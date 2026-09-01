@@ -1,24 +1,30 @@
 import React, { useState, useEffect } from 'react';
-import { Menu, Bell, Search, ChevronDown } from 'lucide-react';
+import { Menu, ChevronDown, LogOut } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import styles from './Navbar.module.css';
-import { getStoredSettings } from '../../services/settingsService';
+import { getUser, logoutUser } from '../../services/authService';
 
 const Navbar = ({ toggleSidebar }) => {
-  const [settings, setSettings] = useState(() => getStoredSettings());
+  const [currentUser, setCurrentUser] = useState(() => getUser());
   const navigate = useNavigate();
 
   useEffect(() => {
-    const handleSettingsUpdate = () => {
-      setSettings(getStoredSettings());
+    const handleAuthChange = () => {
+      setCurrentUser(getUser());
     };
-    window.addEventListener('settingsUpdated', handleSettingsUpdate);
+    window.addEventListener('authChanged', handleAuthChange);
     return () => {
-      window.removeEventListener('settingsUpdated', handleSettingsUpdate);
+      window.removeEventListener('authChanged', handleAuthChange);
     };
   }, []);
 
-  const firstLetter = settings.name ? settings.name.charAt(0).toUpperCase() : 'A';
+  const handleLogout = async () => {
+    await logoutUser();
+    navigate('/login');
+  };
+
+  const displayName = currentUser?.full_name || currentUser?.name || 'User Account';
+  const firstLetter = displayName.charAt(0).toUpperCase();
 
   return (
     <header className={styles.navbar}>
@@ -31,7 +37,7 @@ const Navbar = ({ toggleSidebar }) => {
       <div className={styles.right}>
         <div className={styles.profileDropdown} onClick={() => navigate('/settings')}>
           <div className={styles.avatar}>{firstLetter}</div>
-          <span className={styles.name}>{settings.name}</span>
+          <span className={styles.name}>{displayName}</span>
           <ChevronDown size={16} className={styles.chevron} />
         </div>
       </div>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, 
   FileText, 
@@ -9,11 +9,11 @@ import {
   Settings as SettingsIcon,
   Rocket,
   Users,
-  Car
+  Car,
+  LogOut
 } from 'lucide-react';
-import { motion } from 'framer-motion';
 import styles from './Sidebar.module.css';
-import { getStoredSettings } from '../../services/settingsService';
+import { getUser, logoutUser } from '../../services/authService';
 
 const menuItems = [
   { path: '/dashboard', name: 'Dashboard', icon: LayoutDashboard },
@@ -27,19 +27,28 @@ const menuItems = [
 ];
 
 const Sidebar = ({ isOpen, toggleSidebar }) => {
-  const [settings, setSettings] = useState(() => getStoredSettings());
+  const [currentUser, setCurrentUser] = useState(() => getUser());
+  const navigate = useNavigate();
 
   useEffect(() => {
-    const handleSettingsUpdate = () => {
-      setSettings(getStoredSettings());
+    const handleAuthChange = () => {
+      setCurrentUser(getUser());
     };
-    window.addEventListener('settingsUpdated', handleSettingsUpdate);
+    window.addEventListener('authChanged', handleAuthChange);
     return () => {
-      window.removeEventListener('settingsUpdated', handleSettingsUpdate);
+      window.removeEventListener('authChanged', handleAuthChange);
     };
   }, []);
 
-  const firstLetter = settings.name ? settings.name.charAt(0).toUpperCase() : 'A';
+  const handleLogout = async () => {
+    await logoutUser();
+    navigate('/login');
+  };
+
+  const displayName = currentUser?.full_name || currentUser?.name || 'User Account';
+  const displayUsername = currentUser?.username ? `@${currentUser.username}` : (currentUser?.email || 'User');
+  const firstLetter = displayName.charAt(0).toUpperCase();
+
   return (
     <aside className={`${styles.sidebar} ${isOpen ? styles.open : ''}`}>
       <div className={styles.logoContainer}>
@@ -72,10 +81,19 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
         <div className={styles.userProfile}>
           <div className={styles.avatar}>{firstLetter}</div>
           <div className={styles.userInfo}>
-            <p className={styles.userName}>{settings.name}</p>
-            <p className={styles.userRole}>Workspace Owner</p>
+            <p className={styles.userName} title={displayName}>{displayName}</p>
+            <p className={styles.userRole} title={displayUsername}>{displayUsername}</p>
           </div>
         </div>
+
+        <button 
+          type="button" 
+          className={styles.logoutBtn}
+          onClick={handleLogout}
+        >
+          <LogOut size={16} />
+          <span>Log Out</span>
+        </button>
       </div>
     </aside>
   );

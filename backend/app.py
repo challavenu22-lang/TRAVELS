@@ -42,7 +42,14 @@ def create_app(config_class=Config):
     def health_check():
         return {'status': 'ok'}, 200
 
+    with app.app_context():
+        try:
+            db.create_all()
+        except Exception as e:
+            print("DB initialization error:", e)
+
     return app
+
 
 if __name__ == '__main__':
     app = create_app()

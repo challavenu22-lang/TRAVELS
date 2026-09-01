@@ -2,7 +2,7 @@ import React, { Suspense, lazy, useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout/Layout';
 import Loader from './components/Loader/Loader';
-import { isAuthenticated } from './services/authService';
+import { isAuthenticated, fetchCurrentUser } from './services/authService';
 
 // Lazy loading pages for better performance
 const Dashboard = lazy(() => import('./pages/Dashboard/Dashboard'));
@@ -14,6 +14,7 @@ const Settings = lazy(() => import('./pages/Settings/Settings'));
 const Drivers = lazy(() => import('./pages/Drivers/Drivers'));
 const Vehicles = lazy(() => import('./pages/Vehicles/Vehicles'));
 const Login = lazy(() => import('./pages/Login/Login'));
+const Register = lazy(() => import('./pages/Register/Register'));
 
 // Protected Route wrapper component ensuring authentication
 const ProtectedRoute = ({ children }) => {
@@ -36,6 +37,7 @@ function App() {
   const [authed, setAuthed] = useState(() => isAuthenticated());
 
   useEffect(() => {
+    fetchCurrentUser();
     const handleAuthChange = () => setAuthed(isAuthenticated());
     window.addEventListener('authChanged', handleAuthChange);
     return () => window.removeEventListener('authChanged', handleAuthChange);
@@ -45,10 +47,12 @@ function App() {
     <Router>
       <Suspense fallback={<Loader />}>
         <Routes>
-          {/* Login Route: Always stays on login page when loaded */}
-          <Route path="/login" element={<Login />} />
+          {/* Public Authentication Routes */}
+          <Route path="/login" element={authed ? <Navigate to="/dashboard" replace /> : <Login />} />
+          <Route path="/register" element={authed ? <Navigate to="/dashboard" replace /> : <Register />} />
+          <Route path="/signup" element={<Navigate to="/register" replace />} />
           
-          {/* Root Route: Redirects based on auth status */}
+          {/* Root Route */}
           <Route 
             path="/" 
             element={authed ? <Navigate to="/dashboard" replace /> : <Navigate to="/login" replace />} 
