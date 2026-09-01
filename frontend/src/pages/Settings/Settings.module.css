@@ -64,6 +64,24 @@
   transition: all var(--transition-fast);
 }
 
+/* Read-Only / Disabled Profile Fields with 🚫 cursor */
+.readOnlyInput,
+.formGroup input:disabled,
+.formGroup input[readonly] {
+  background-color: #f3f4f6 !important;
+  color: #6b7280 !important;
+  cursor: not-allowed !important;
+  border-color: #e5e7eb !important;
+  user-select: none;
+}
+
+.readOnlyInput:hover,
+.formGroup input:disabled:hover,
+.formGroup input[readonly]:hover {
+  cursor: not-allowed !important;
+  background-color: #f3f4f6 !important;
+}
+
 .formGroup input:focus,
 .formGroup select:focus {
   outline: none;

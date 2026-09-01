@@ -5,7 +5,7 @@ import { LogOut } from 'lucide-react';
 import Button from '../../components/Button/Button';
 import styles from './Settings.module.css';
 import { getStoredSettings, saveStoredSettings } from '../../services/settingsService';
-import { getUser, updateStoredUser, logoutUser, getAuthToken } from '../../services/authService';
+import { getUser, logoutUser } from '../../services/authService';
 
 const Settings = () => {
   const [currentUser, setCurrentUser] = useState(() => getUser() || {});
@@ -16,7 +16,6 @@ const Settings = () => {
   const [email, setEmail] = useState('');
 
   const [messageText, setMessageText] = useState('');
-  const [errorText, setErrorText] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
   const navigate = useNavigate();
@@ -25,7 +24,7 @@ const Settings = () => {
     const user = getUser() || {};
     setCurrentUser(user);
     setFullName(user.full_name || user.name || '');
-    setUsername(user.username || '');
+    setUsername(user.username ? `@${user.username}` : '');
     setEmail(user.email || '');
   }, []);
 
@@ -42,107 +41,14 @@ const Settings = () => {
     });
   };
 
-  const handleSave = async (e) => {
+  const handleSave = (e) => {
     e.preventDefault();
-    setMessageText('');
-    setErrorText('');
-
-    const cleanName = fullName.trim();
-    const cleanUsername = username.trim().replace(/^@/, '');
-    const cleanEmail = email.trim().toLowerCase();
-
-    if (!cleanName || cleanName.length < 2) {
-      setErrorText('Full name must be at least 2 characters.');
-      return;
-    }
-
-    if (!cleanUsername || cleanUsername.length < 3 || cleanUsername.length > 30 || !/^[a-zA-Z0-9_.]+$/.test(cleanUsername)) {
-      setErrorText('Username must be 3-30 characters long and contain only letters, numbers, underscores, and periods.');
-      return;
-    }
-
-    if (!cleanEmail || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(cleanEmail)) {
-      setErrorText('Please enter a valid email address.');
-      return;
-    }
-
     setIsSaving(true);
-
-    let updatedUser = null;
-    let serverError = '';
-
-    const token = getAuthToken();
-    if (token) {
-      try {
-        const response = await fetch('/api/auth/profile', {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({
-            full_name: cleanName,
-            username: cleanUsername,
-            email: cleanEmail
-          })
-        });
-
-        const contentType = response.headers.get('content-type') || '';
-        if (response.ok && contentType.includes('application/json')) {
-          const data = await response.json();
-          updatedUser = data.user;
-        } else if (!response.ok && contentType.includes('application/json')) {
-          const data = await response.json();
-          serverError = data.error || 'Failed to update profile.';
-        }
-      } catch (err) {
-        console.warn('Backend API offline or static deployment, updating local storage.');
-      }
-    }
-
-    if (serverError) {
-      setErrorText(serverError);
-      setIsSaving(false);
-      return;
-    }
-
-    if (!updatedUser) {
-      // Local storage profile update fallback
-      const existingUsers = JSON.parse(localStorage.getItem('app_registered_users') || '[]');
-      
-      const dupUser = existingUsers.find(u => 
-        u.username.toLowerCase() === cleanUsername.toLowerCase() && u.id !== currentUser.id
-      );
-      if (dupUser) {
-        setErrorText('Username is already taken.');
-        setIsSaving(false);
-        return;
-      }
-
-      const dupEmail = existingUsers.find(u => 
-        u.email.toLowerCase() === cleanEmail.toLowerCase() && u.id !== currentUser.id
-      );
-      if (dupEmail) {
-        setErrorText('Email is already registered.');
-        setIsSaving(false);
-        return;
-      }
-
-      updatedUser = {
-        ...currentUser,
-        full_name: cleanName,
-        username: cleanUsername,
-        email: cleanEmail
-      };
-    }
-
-    // Update stored user profile & trigger authChanged event
-    updateStoredUser(updatedUser);
-    setCurrentUser(updatedUser);
-
     saveStoredSettings(settings);
-    setIsSaving(false);
-    setMessageText('Profile updated successfully.');
+    setTimeout(() => {
+      setIsSaving(false);
+      setMessageText('Preferences saved successfully.');
+    }, 300);
   };
 
   const handleLogout = async () => {
@@ -166,36 +72,45 @@ const Settings = () => {
         <div className={`card ${styles.settingsCard}`}>
           <h2>Profile Settings</h2>
           <form className={styles.form} onSubmit={handleSave}>
+            {/* Full Name - Disabled / Read Only with 🚫 cursor */}
             <div className={styles.formGroup}>
               <label htmlFor="fullNameInput">Full Name</label>
               <input 
                 id="fullNameInput"
                 type="text" 
                 value={fullName} 
-                onChange={(e) => setFullName(e.target.value)} 
-                placeholder="Enter your full name"
+                readOnly
+                disabled
+                className={styles.readOnlyInput}
+                title="Full Name cannot be edited"
               />
             </div>
 
+            {/* Username - Disabled / Read Only with 🚫 cursor */}
             <div className={styles.formGroup}>
               <label htmlFor="usernameInput">Username</label>
               <input 
                 id="usernameInput"
                 type="text" 
                 value={username} 
-                onChange={(e) => setUsername(e.target.value)} 
-                placeholder="Choose a username (e.g. venu123)"
+                readOnly
+                disabled
+                className={styles.readOnlyInput}
+                title="Username cannot be edited"
               />
             </div>
             
+            {/* Email Address - Disabled / Read Only with 🚫 cursor */}
             <div className={styles.formGroup}>
               <label htmlFor="emailInput">Email Address</label>
               <input 
                 id="emailInput"
                 type="email" 
                 value={email} 
-                onChange={(e) => setEmail(e.target.value)} 
-                placeholder="Enter your email address"
+                readOnly
+                disabled
+                className={styles.readOnlyInput}
+                title="Email Address cannot be edited"
               />
             </div>
           </form>
@@ -238,12 +153,6 @@ const Settings = () => {
           </form>
         </div>
       </div>
-
-      {errorText && (
-        <div className={styles.errorBox}>
-          {errorText}
-        </div>
-      )}
 
       {messageText && (
         <div className={styles.successBox}>
