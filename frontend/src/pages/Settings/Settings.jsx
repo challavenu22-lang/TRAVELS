@@ -1,15 +1,20 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { LogOut } from 'lucide-react';
 import Button from '../../components/Button/Button';
 import styles from './Settings.module.css';
 import { getStoredSettings, saveStoredSettings } from '../../services/settingsService';
-import { logoutUser } from '../../services/authService';
+import { getUser } from '../../services/authService';
 
 const Settings = () => {
+  const [currentUser, setCurrentUser] = useState(() => getUser());
   const [settings, setSettings] = useState(() => getStoredSettings());
-  const navigate = useNavigate();
+
+  useEffect(() => {
+    const user = getUser();
+    if (user) {
+      setCurrentUser(user);
+    }
+  }, []);
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -19,7 +24,6 @@ const Settings = () => {
         [name]: type === 'checkbox' ? checked : value
       };
       
-      // If checkbox (Dark Mode or Email Notifications), save immediately!
       if (type === 'checkbox') {
         saveStoredSettings(updated);
       }
@@ -41,10 +45,9 @@ const Settings = () => {
     alert('Settings saved successfully!');
   };
 
-  const handleLogout = () => {
-    logoutUser();
-    navigate('/login', { replace: true });
-  };
+  const fullNameVal = currentUser?.full_name || currentUser?.name || settings.name || '';
+  const usernameVal = currentUser?.username ? `@${currentUser.username}` : '';
+  const emailVal = currentUser?.email || settings.email || '';
 
   return (
     <motion.div 
@@ -67,18 +70,30 @@ const Settings = () => {
               <input 
                 type="text" 
                 name="name" 
-                value={settings.name} 
-                onChange={handleChange} 
+                value={fullNameVal} 
+                readOnly
               />
             </div>
+
+            {usernameVal && (
+              <div className={styles.formGroup}>
+                <label>Username</label>
+                <input 
+                  type="text" 
+                  name="username" 
+                  value={usernameVal} 
+                  readOnly
+                />
+              </div>
+            )}
             
             <div className={styles.formGroup}>
               <label>Email Address</label>
               <input 
                 type="email" 
                 name="email" 
-                value={settings.email} 
-                onChange={handleChange} 
+                value={emailVal} 
+                readOnly
               />
             </div>
           </form>
@@ -117,17 +132,6 @@ const Settings = () => {
                 />
                 <span className={styles.slider}></span>
               </label>
-            </div>
-
-            <div className={styles.logoutRow}>
-              <button 
-                type="button" 
-                className={styles.logoutBtn}
-                onClick={handleLogout}
-              >
-                <LogOut size={18} />
-                <span>Logout</span>
-              </button>
             </div>
           </form>
         </div>

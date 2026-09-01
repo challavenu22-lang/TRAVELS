@@ -70,6 +70,21 @@ const Register = () => {
       return;
     }
 
+    // 6. Check duplicate username or email in stored local accounts
+    const existingUsers = JSON.parse(localStorage.getItem('app_registered_users') || '[]');
+
+    const dupUsername = existingUsers.find(u => u.username.toLowerCase() === cleanUsername.toLowerCase());
+    if (dupUsername) {
+      setErrorText('Username is already taken.');
+      return;
+    }
+
+    const dupEmail = existingUsers.find(u => u.email.toLowerCase() === cleanEmail.toLowerCase());
+    if (dupEmail) {
+      setErrorText('Email is already registered.');
+      return;
+    }
+
     setIsLoading(true);
 
     let isServerSuccess = false;
@@ -106,23 +121,7 @@ const Register = () => {
     }
 
     if (!isServerSuccess) {
-      // Save locally if server is static/offline
-      const existingUsers = JSON.parse(localStorage.getItem('app_registered_users') || '[]');
-
-      const dupUsername = existingUsers.find(u => u.username.toLowerCase() === cleanUsername.toLowerCase());
-      if (dupUsername) {
-        setErrorText('Username is already taken.');
-        setIsLoading(false);
-        return;
-      }
-
-      const dupEmail = existingUsers.find(u => u.email.toLowerCase() === cleanEmail.toLowerCase());
-      if (dupEmail) {
-        setErrorText('Email is already registered.');
-        setIsLoading(false);
-        return;
-      }
-
+      // Save locally if server API is offline or on static Vercel host
       const newUser = {
         id: `U-${Date.now()}`,
         full_name: cleanFullName,
