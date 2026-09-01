@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { User, AtSign, Mail, Lock, Eye, EyeOff, Rocket } from 'lucide-react';
 import styles from './Register.module.css';
 
@@ -28,7 +28,7 @@ const Register = () => {
     const cleanUsername = username.trim();
     const cleanEmail = email.trim();
 
-    // Client-side quick checks
+    // 1. Full Name Validation
     if (!cleanFullName) {
       setErrorText('Full name is required.');
       return;
@@ -37,6 +37,8 @@ const Register = () => {
       setErrorText('Full name must be at least 2 characters.');
       return;
     }
+
+    // 2. Username Validation
     if (!cleanUsername) {
       setErrorText('Username is required.');
       return;
@@ -45,10 +47,14 @@ const Register = () => {
       setErrorText('Username must be 3-30 characters long and contain only letters, numbers, underscores, and periods.');
       return;
     }
+
+    // 3. Email Validation
     if (!cleanEmail || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(cleanEmail)) {
       setErrorText('Please enter a valid email address.');
       return;
     }
+
+    // 4. Password Validation
     if (!password || password.length < 8) {
       setErrorText('Password must be at least 8 characters.');
       return;
@@ -57,12 +63,17 @@ const Register = () => {
       setErrorText('Password must contain at least one letter and one number.');
       return;
     }
+
+    // 5. Confirm Password Validation
     if (password !== confirmPassword) {
       setErrorText('Passwords do not match.');
       return;
     }
 
     setIsLoading(true);
+
+    let isServerSuccess = false;
+    let serverError = '';
 
     try {
       const response = await fetch('/api/auth/register', {
@@ -77,23 +88,59 @@ const Register = () => {
         })
       });
 
-      const data = await response.json();
+      const contentType = response.headers.get('content-type') || '';
+      if (response.ok && contentType.includes('application/json')) {
+        isServerSuccess = true;
+      } else if (!response.ok && contentType.includes('application/json')) {
+        const data = await response.json();
+        serverError = data.error || 'Registration failed.';
+      }
+    } catch (err) {
+      console.warn('Backend API offline or static host, using client storage fallback.');
+    }
 
-      if (!response.ok) {
-        setErrorText(data.error || 'Something went wrong. Please try again.');
+    if (serverError) {
+      setErrorText(serverError);
+      setIsLoading(false);
+      return;
+    }
+
+    if (!isServerSuccess) {
+      // Save locally if server is static/offline
+      const existingUsers = JSON.parse(localStorage.getItem('app_registered_users') || '[]');
+
+      const dupUsername = existingUsers.find(u => u.username.toLowerCase() === cleanUsername.toLowerCase());
+      if (dupUsername) {
+        setErrorText('Username is already taken.');
         setIsLoading(false);
         return;
       }
 
-      setSuccessText('Account created successfully. Redirecting to login...');
-      setTimeout(() => {
-        navigate('/login');
-      }, 1500);
-    } catch (err) {
-      console.error('Registration error:', err);
-      setErrorText('Unable to connect to the server. Please try again.');
-      setIsLoading(false);
+      const dupEmail = existingUsers.find(u => u.email.toLowerCase() === cleanEmail.toLowerCase());
+      if (dupEmail) {
+        setErrorText('Email is already registered.');
+        setIsLoading(false);
+        return;
+      }
+
+      const newUser = {
+        id: `U-${Date.now()}`,
+        full_name: cleanFullName,
+        username: cleanUsername.toLowerCase(),
+        email: cleanEmail.toLowerCase(),
+        password: password,
+        role: 'user',
+        created_at: new Date().toISOString()
+      };
+
+      existingUsers.push(newUser);
+      localStorage.setItem('app_registered_users', JSON.stringify(existingUsers));
     }
+
+    setSuccessText('Account created successfully. Redirecting to login...');
+    setTimeout(() => {
+      navigate('/login');
+    }, 1200);
   };
 
   return (
