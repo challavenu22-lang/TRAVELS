@@ -56,6 +56,30 @@ export const loginUser = (token, user = {}, remember = true) => {
   window.dispatchEvent(new Event('authChanged'));
 };
 
+export const updateStoredUser = (updatedUser) => {
+  const current = getUser() || {};
+  const merged = { ...current, ...updatedUser, name: updatedUser.full_name || updatedUser.name || current.name };
+  const remember = Boolean(localStorage.getItem('token'));
+  const storage = remember ? localStorage : sessionStorage;
+  storage.setItem('user', JSON.stringify(merged));
+
+  // Sync in local registered accounts storage
+  const existingUsers = JSON.parse(localStorage.getItem('app_registered_users') || '[]');
+  const userIdx = existingUsers.findIndex(u => u.id === merged.id || u.username === current.username || u.email === current.email);
+  if (userIdx > -1) {
+    existingUsers[userIdx] = {
+      ...existingUsers[userIdx],
+      full_name: merged.full_name || merged.name,
+      username: merged.username,
+      email: merged.email
+    };
+    localStorage.setItem('app_registered_users', JSON.stringify(existingUsers));
+  }
+
+  window.dispatchEvent(new Event('authChanged'));
+  return merged;
+};
+
 export const logoutUser = async () => {
   const token = getAuthToken();
   if (token) {
@@ -105,7 +129,7 @@ export const fetchCurrentUser = async () => {
       storage.setItem('user', JSON.stringify(user));
       window.dispatchEvent(new Event('authChanged'));
       return user;
-    } else {
+    } else if (res.status === 401) {
       logoutUser();
       return null;
     }

@@ -34,7 +34,7 @@ def register():
     if not username:
         return jsonify({'error': 'Username is required.'}), 400
     if len(username) < 3 or len(username) > 30 or not USERNAME_REGEX.match(username):
-        return jsonify({'error': 'Username must be 3-30 characters and contain only letters, numbers, underscores, and periods.'}), 400
+        return jsonify({'error': 'Username must be 3-30 characters long and contain only letters, numbers, underscores, and periods.'}), 400
 
     if User.query.filter(db.func.lower(User.username) == username.lower()).first():
         return jsonify({'error': 'Username is already taken.'}), 400
@@ -74,8 +74,11 @@ def register():
     db.session.add(default_settings)
     db.session.commit()
     
+    # Generate token for direct login upon creation
+    token = generate_token(new_user.id)
     return jsonify({
-        'message': 'Account created successfully. You can now log in.',
+        'message': 'Account created successfully.',
+        'token': token,
         'user': new_user.to_dict()
     }), 201
 
@@ -86,20 +89,68 @@ def login():
     password = data.get('password') or ''
 
     if not identifier or not password:
-        return jsonify({'error': 'Invalid username/email or password.'}), 401
+        return jsonify({'error': 'Incorrect user ID or email.'}), 401
 
     user = User.query.filter(
         (db.func.lower(User.email) == identifier.lower()) | 
         (db.func.lower(User.username) == identifier.lower())
     ).first()
 
-    if not user or not user.password_hash or not check_password_hash(user.password_hash, password):
-        return jsonify({'error': 'Invalid username/email or password.'}), 401
+    if not user:
+        return jsonify({'error': 'Incorrect user ID or email.'}), 401
+
+    if not user.password_hash or not check_password_hash(user.password_hash, password):
+        return jsonify({'error': 'Incorrect password.'}), 401
 
     token = generate_token(user.id)
     return jsonify({
         'token': token,
         'user': user.to_dict()
+    }), 200
+
+@auth_bp.route('/profile', methods=['PUT'])
+@login_required
+def update_profile(current_user):
+    data = request.get_json() or {}
+    
+    full_name = (data.get('full_name') or data.get('name') or '').strip()
+    username = (data.get('username') or '').strip()
+    email = (data.get('email') or '').strip().lower()
+
+    if full_name:
+        if len(full_name) < 2:
+            return jsonify({'error': 'Full name must be at least 2 characters.'}), 400
+        current_user.full_name = full_name
+
+    if username and username.lower() != (current_user.username or '').lower():
+        if len(username) < 3 or len(username) > 30 or not USERNAME_REGEX.match(username):
+            return jsonify({'error': 'Username must be 3-30 characters long and contain only letters, numbers, underscores, and periods.'}), 400
+        
+        dup_username = User.query.filter(
+            db.func.lower(User.username) == username.lower(),
+            User.id != current_user.id
+        ).first()
+        if dup_username:
+            return jsonify({'error': 'Username is already taken.'}), 400
+        current_user.username = username.lower()
+
+    if email and email.lower() != (current_user.email or '').lower():
+        if not EMAIL_REGEX.match(email):
+            return jsonify({'error': 'Please enter a valid email address.'}), 400
+        
+        dup_email = User.query.filter(
+            db.func.lower(User.email) == email.lower(),
+            User.id != current_user.id
+        ).first()
+        if dup_email:
+            return jsonify({'error': 'Email is already registered.'}), 400
+        current_user.email = email.lower()
+
+    db.session.commit()
+
+    return jsonify({
+        'message': 'Profile updated successfully.',
+        'user': current_user.to_dict()
     }), 200
 
 @auth_bp.route('/logout', methods=['POST'])
@@ -116,7 +167,7 @@ def forgot_password():
 
     user = User.query.filter(db.func.lower(User.email) == email.lower()).first()
     if not user:
-        return jsonify({'error': 'No account found with this email address.'}), 404
+        return jsonify({'error': 'Incorrect user ID or email.'}), 404
 
     reset_token = secrets.token_urlsafe(32)
     user.reset_token = reset_token

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { NavLink } from 'react-router-dom';
 import { 
   LayoutDashboard, 
   FileText, 
@@ -9,11 +9,10 @@ import {
   Settings as SettingsIcon,
   Rocket,
   Users,
-  Car,
-  LogOut
+  Car
 } from 'lucide-react';
 import styles from './Sidebar.module.css';
-import { getUser, logoutUser } from '../../services/authService';
+import { getUser } from '../../services/authService';
 
 const menuItems = [
   { path: '/dashboard', name: 'Dashboard', icon: LayoutDashboard },
@@ -28,7 +27,6 @@ const menuItems = [
 
 const Sidebar = ({ isOpen, toggleSidebar }) => {
   const [currentUser, setCurrentUser] = useState(() => getUser());
-  const navigate = useNavigate();
 
   useEffect(() => {
     const handleAuthChange = () => {
@@ -39,11 +37,6 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
       window.removeEventListener('authChanged', handleAuthChange);
     };
   }, []);
-
-  const handleLogout = async () => {
-    await logoutUser();
-    navigate('/login');
-  };
 
   const displayName = currentUser?.full_name || currentUser?.name || 'User Account';
   const displayUsername = currentUser?.username ? `@${currentUser.username}` : (currentUser?.email || 'User');
@@ -85,15 +78,6 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
             <p className={styles.userRole} title={displayUsername}>{displayUsername}</p>
           </div>
         </div>
-
-        <button 
-          type="button" 
-          className={styles.logoutBtn}
-          onClick={handleLogout}
-        >
-          <LogOut size={16} />
-          <span>Log Out</span>
-        </button>
       </div>
     </aside>
   );

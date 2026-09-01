@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { User, AtSign, Mail, Lock, Eye, EyeOff, Rocket } from 'lucide-react';
+import { loginUser } from '../../services/authService';
 import styles from './Register.module.css';
 
 const Register = () => {
@@ -87,7 +88,8 @@ const Register = () => {
 
     setIsLoading(true);
 
-    let isServerSuccess = false;
+    let createdUser = null;
+    let createdToken = null;
     let serverError = '';
 
     try {
@@ -105,7 +107,9 @@ const Register = () => {
 
       const contentType = response.headers.get('content-type') || '';
       if (response.ok && contentType.includes('application/json')) {
-        isServerSuccess = true;
+        const data = await response.json();
+        createdUser = data.user;
+        createdToken = data.token;
       } else if (!response.ok && contentType.includes('application/json')) {
         const data = await response.json();
         serverError = data.error || 'Registration failed.';
@@ -120,26 +124,32 @@ const Register = () => {
       return;
     }
 
-    if (!isServerSuccess) {
-      // Save locally if server API is offline or on static Vercel host
-      const newUser = {
+    if (!createdUser || !createdToken) {
+      // Save locally and authenticate immediately if server API is offline or on static Vercel host
+      createdUser = {
         id: `U-${Date.now()}`,
         full_name: cleanFullName,
         username: cleanUsername.toLowerCase(),
         email: cleanEmail.toLowerCase(),
-        password: password,
         role: 'user',
         created_at: new Date().toISOString()
       };
+      createdToken = `token-${createdUser.id}-${Date.now()}`;
 
-      existingUsers.push(newUser);
+      existingUsers.push({
+        ...createdUser,
+        password: password
+      });
       localStorage.setItem('app_registered_users', JSON.stringify(existingUsers));
     }
 
-    setSuccessText('Account created successfully. Redirecting to login...');
+    // Authenticate user immediately and redirect DIRECTLY to /dashboard
+    loginUser(createdToken, createdUser, true);
+    setSuccessText('Account created successfully.');
+    
     setTimeout(() => {
-      navigate('/login');
-    }, 1200);
+      navigate('/dashboard');
+    }, 800);
   };
 
   return (

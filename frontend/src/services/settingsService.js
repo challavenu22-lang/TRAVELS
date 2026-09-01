@@ -1,8 +1,6 @@
 const DEFAULT_SETTINGS = {
   darkMode: false,
   startupPage: 'Dashboard',
-  name: 'Admin User',
-  email: 'admin@manivthatours.com',
   notifications: true,
   exportFormat: 'PDF'
 };

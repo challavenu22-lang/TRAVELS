@@ -40,12 +40,12 @@ const Login = () => {
     const passwordVal = password;
 
     if (!identVal) {
-      showLoginError("Please enter your email or username.");
+      showLoginError("Incorrect user ID or email.");
       return;
     }
 
     if (!passwordVal) {
-      showLoginError("Please enter your password.");
+      showLoginError("Incorrect password.");
       return;
     }
 
@@ -53,7 +53,7 @@ const Login = () => {
 
     let authenticatedUser = null;
     let token = null;
-    let isExplicitInvalid = false;
+    let serverErrorMessage = '';
 
     try {
       const response = await fetch('/api/auth/login', {
@@ -67,45 +67,55 @@ const Login = () => {
         const data = await response.json();
         authenticatedUser = data.user;
         token = data.token;
-      } else if (response.status === 401 && contentType.includes('application/json')) {
-        isExplicitInvalid = true;
+      } else if (!response.ok && contentType.includes('application/json')) {
+        const data = await response.json();
+        serverErrorMessage = data.error || 'Incorrect user ID or email.';
       }
     } catch (error) {
       console.warn("Backend API offline or static host, using local storage fallback.");
     }
 
-    if (isExplicitInvalid) {
-      showLoginError("Invalid username/email or password.");
+    if (serverErrorMessage) {
+      showLoginError(serverErrorMessage);
       setIsLoading(false);
       return;
     }
 
     if (!authenticatedUser) {
-      // Check local registered users list
+      // Local account fallback
       const existingUsers = JSON.parse(localStorage.getItem('app_registered_users') || '[]');
       const foundUser = existingUsers.find(u => 
-        (u.username.toLowerCase() === identVal.toLowerCase() || u.email.toLowerCase() === identVal.toLowerCase()) &&
-        u.password === passwordVal
+        u.username.toLowerCase() === identVal.toLowerCase() || u.email.toLowerCase() === identVal.toLowerCase()
       );
 
-      if (foundUser) {
-        authenticatedUser = {
-          id: foundUser.id,
-          full_name: foundUser.full_name,
-          username: foundUser.username,
-          email: foundUser.email,
-          role: foundUser.role || 'user',
-          created_at: foundUser.created_at
-        };
-        token = `token-${foundUser.id}-${Date.now()}`;
+      if (!foundUser) {
+        showLoginError("Incorrect user ID or email.");
+        setIsLoading(false);
+        return;
       }
+
+      if (foundUser.password !== passwordVal) {
+        showLoginError("Incorrect password.");
+        setIsLoading(false);
+        return;
+      }
+
+      authenticatedUser = {
+        id: foundUser.id,
+        full_name: foundUser.full_name,
+        username: foundUser.username,
+        email: foundUser.email,
+        role: foundUser.role || 'user',
+        created_at: foundUser.created_at
+      };
+      token = `token-${foundUser.id}-${Date.now()}`;
     }
 
     if (authenticatedUser && token) {
       loginUser(token, authenticatedUser, rememberMe);
       navigate('/dashboard');
     } else {
-      showLoginError("Invalid username/email or password.");
+      showLoginError("Incorrect user ID or email.");
       setIsLoading(false);
     }
   };
@@ -140,10 +150,10 @@ const Login = () => {
         const data = await res.json();
         setForgotStatusText(data.message || 'Password reset link sent successfully.');
       } else {
-        setForgotStatusText('Password reset link request received. (Note: Email service API key is not configured.)');
+        setForgotStatusText('Password reset link request received.');
       }
     } catch (err) {
-      setForgotStatusText('Password reset link request received. (Note: Email service API key is not configured.)');
+      setForgotStatusText('Password reset link request received.');
     } finally {
       setIsSendingForgot(false);
     }
